@@ -2,6 +2,9 @@ package logic
 
 import (
 	"context"
+	"go-zero2/internal/model/usermodel"
+	"go-zero2/pkg/cryptx"
+	"google.golang.org/grpc/status"
 
 	"go-zero2/service/userservice/internal/svc"
 	"go-zero2/service/userservice/pb/userservice"
@@ -24,7 +27,21 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 }
 
 func (l *LoginLogic) Login(in *userservice.LoginRequest) (*userservice.LoginResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &userservice.LoginResponse{}, nil
+	res, err := l.svcCtx.UserModel.FindOneByMobile(l.ctx, in.Mobile)
+	if err != nil {
+		if err == usermodel.ErrNotFound {
+			return nil, status.Error(100, "user not found")
+		}
+		return nil, status.Error(500, err.Error())
+	}
+	password := cryptx.PasswordEncrypt(l.svcCtx.Config.Salt, in.Password)
+	if password != res.Password {
+		return nil, status.Error(500, "password error")
+	}
+	return &userservice.LoginResponse{
+		Id:     res.Id,
+		Name:   res.Name,
+		Gender: res.Gender,
+		Mobile: res.Mobile,
+	}, nil
 }
